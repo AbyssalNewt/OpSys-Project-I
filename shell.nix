@@ -2,7 +2,7 @@ with import <nixpkgs> {};
 
 stdenv.mkDerivation rec {
   name = "rs";
-  naitiveBuildInputs = [
+  nativeBuildInputs = [
     rustc
     cargo
   ];
