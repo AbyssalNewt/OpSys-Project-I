@@ -24,3 +24,4 @@ rustc-ice-*.txt
 #.idea//target
 .direnv/*
 .idea/*
+test.sh
