@@ -1,3 +1,6 @@
+mod prompt;
 fn main() {
-    println!("Hello, world!");
+    loop {
+        prompt::prompt();
+    }
 }
