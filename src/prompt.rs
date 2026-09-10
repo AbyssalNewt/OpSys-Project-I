@@ -4,7 +4,7 @@ use std::io::{self,Write};
 pub fn prompt() -> Result<String, io::Error> {
     let user = env::var("USER").unwrap_or_else(|_| "unknown".to_string());
     let machine = env::var("MACHINE").unwrap_or_else(|_| "demanitus".to_string());
-    let pwd = env::var("MACHINE").unwrap_or_else(|_| "unknown".to_string());
+    let pwd = env::var("PWD").unwrap_or_else(|_| "unknown".to_string());
     io::stdout().flush();
     print!("{}@{}:{}> ",user,machine,pwd);
     io::stdout().flush();
