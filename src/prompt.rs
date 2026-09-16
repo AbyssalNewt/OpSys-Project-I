@@ -3,22 +3,23 @@ use crate::tilde_expansion::*;
 use std::env;
 use std::io::{self,Write};
 
-pub fn prompt() -> Result<String, io::Error> {
+pub fn prompt() -> String {
     let user = env::var("USER").unwrap_or_else(|_| "unknown".to_string());
     let machine = env::var("MACHINE").unwrap_or_else(|_| "demanitus".to_string());
     let pwd = env::var("PWD").unwrap_or_else(|_| "unknown".to_string());
-    io::stdout().flush()?;
+
+    io::stdout().flush().unwrap();
     print!("{}@{}:{}> ",user,machine,pwd);
-    io::stdout().flush()?;
+    io::stdout().flush().unwrap();
 
     let mut input = String::new();
     let stdin = io::stdin();
 
-    stdin.read_line(&mut input)?;
+    stdin.read_line(&mut input).unwrap();
 
     validate(input.trim().to_string());
 
-    Ok(input)
+    input
 }
 
 fn validate(cmd: String) {
