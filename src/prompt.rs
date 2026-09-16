@@ -1,3 +1,5 @@
+use crate::env_expansion::*;
+use crate::tilde_expansion::*;
 use std::env;
 use std::io::{self,Write};
 
@@ -21,9 +23,11 @@ pub fn prompt() -> Result<String, io::Error> {
 
 fn validate(cmd: String) {
     let args: Vec<&str> = cmd.split(' ').collect();
+    let mut args = env_expansion(args);
+    args = tilde_expansion(args);
 
-    match args[0] {
+    match args[0].as_str() {
         "exit"=>std::process::exit(0),
-        _=>println!("{}: command not found\n",cmd),
+        _=>println!("{}: command not found\n", args[0]),
     }
 }
