@@ -22,12 +22,12 @@ pub fn prompt() -> Result<String, io::Error> {
 }
 
 fn validate(cmd: String) {
-    let args: Vec<&str> = cmd.split(' ').collect();
-    let mut args = env_expansion(args);
+    let mut args: Vec<String> = cmd.split(' ').map(|s| s.to_string()).collect();
+    args = env_expansion(args);
     args = tilde_expansion(args);
 
     match args[0].as_str() {
         "exit"=>std::process::exit(0),
-        _=>println!("{}: command not found\n", args[0]),
+        _=>println!("{}: command not found\n", args.join(" ")),
     }
 }
