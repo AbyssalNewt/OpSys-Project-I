@@ -1,12 +1,17 @@
-use std::env;
+use std::{cmp,env};
 
 /// Expands tilde to $HOME.
-pub fn tilde_expansion(strings:Vec<String>) -> Vec<String> {
+pub fn tilde_expansion(strings:&mut Vec<String>) -> &mut Vec<String> {
     let home = env::var("HOME").unwrap_or_default();
-    strings.iter().map(|s| 
-        match s.len() {
-            0 => s.to_string(),
-            1 => match s.as_str() { "~" => home.to_string(), _ => s.to_string() },
-            _ => match &s[0..2] { "~/" => home.to_string() + &s[1..], _ => s.to_string() },
-        }).collect()
+    let mut i = 0;
+
+    while i < strings.len() {
+        // calc min to prevent out of bounds slicing
+        let min = cmp::min(2, strings[i].len());
+        if &strings[i][..min] == &"~/"[..min] {
+            strings[i] = home.clone() + &strings[i][min..];
+        }
+        i += 1;
+    }
+    strings
 }
