@@ -8,7 +8,7 @@ pub fn env_expansion(args:&mut Vec<String>) -> &mut Vec<String>{
             // Match first char
             match &args[i][0..1] { 
                 "$" => args[i] = env::var(&args[i][1..]).unwrap_or_default(),
-                _ => continue}
+                _ => ()}
         }
         i += 1;
     }
