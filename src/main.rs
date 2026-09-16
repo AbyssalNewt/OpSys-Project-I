@@ -1,4 +1,6 @@
 mod env_expansion;
+mod execute;
+mod path_search;
 mod prompt;
 mod tilde_expansion;
 
