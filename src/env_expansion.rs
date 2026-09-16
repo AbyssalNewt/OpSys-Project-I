@@ -1,7 +1,7 @@
 use std::env;
 
 /// Expands environment variables.
-pub fn env_expansion(strings:Vec<&str>) -> Vec<String> {
+pub fn env_expansion(strings:Vec<String>) -> Vec<String> {
     strings.iter().map(|s| 
         // Prevent out of bounds slicing
         if s.len() > 0 {
