@@ -10,7 +10,7 @@ fn main() {
 
         match args[0].as_str() {
             "exit" => break,
-            _ => println!("{}: command not found\n", args.join(" ")),
+            _ => println!("{}: command not found\n", args[0]),
         }
     }
 }
