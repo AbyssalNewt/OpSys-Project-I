@@ -8,7 +8,7 @@ pub fn tilde_expansion(args:&mut Vec<String>) -> &mut Vec<String> {
     while i < args.len() {
         // calc min to prevent out of bounds slicing
         let min = cmp::min(2, args[i].len());
-        if &args[i][..min] == &"~/"[..min] {
+        if min > 0 && &args[i][..min] == &"~/"[..min] {
             args[i] = home.clone() + &args[i][min..];
         }
         i += 1;
