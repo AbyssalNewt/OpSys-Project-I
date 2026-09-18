@@ -3,6 +3,8 @@ mod path_search;
 mod prompt;
 mod tilde_expansion;
 
+mod execute;
+
 fn main() {
     loop {
         let mut args = prompt::prompt();
