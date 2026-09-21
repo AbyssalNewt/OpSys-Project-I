@@ -5,6 +5,7 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [
     rustc
     cargo
+    rust-analyzer
   ];
   buildInputs = [
   ];
