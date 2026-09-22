@@ -21,6 +21,11 @@ fn main() {
             Some(t) => t,
             _ => {println!("{}: command not found\n", args[0]); continue}
         };
-        println!("{}: command found\n", path_to_cmd)
+
+	let mut command: Vec<String> = Vec::new();
+	command.push(path_to_cmd);
+	command.append(&mut args);
+
+        execute::execute(command);
     }
 }

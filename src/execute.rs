@@ -2,15 +2,42 @@ use std::ffi::CStr;
 use std::ffi::CString;
 
 pub fn execute(path: Vec<String>) -> Result<usize, nix::Error> {
-	let fixedpath: Vec<core::ffi::CStr>;
+	let mut keepthecstringsalive: Vec<CString> = Vec::new();
+
 	for arg in path {
-		fixedpath.push(CStr::new(arg.as_str().unwrap()).as_c_str());
+		let cstring = CString::new(arg).map_err(|_| nix::errno::Errno::EINVAL)?;
+			
+		keepthecstringsalive.push(cstring);
 	}
-	let pid = nix::unistd::fork();
-	if pid.unwrap() == 0 {
-		nix::unistd::execv(fixedpath[0],fixedpath[1..]);
-	} else {
-		nix::sys::wait::waitpid(pid.unwrap());
+
+	let fixedpathref = keepthecstringsalive[0].clone();
+	let fixedpath = fixedpathref.as_c_str();
+
+	keepthecstringsalive.drain(..2);
+
+	let mut fixedargs: Vec<&CStr> = Vec::new();
+
+	for arg in &keepthecstringsalive {
+		fixedargs.push(arg.as_c_str());
 	}
-	Ok()
+
+	let pid = unsafe { nix::unistd::fork()? };
+
+	match pid {
+		nix::unistd::ForkResult::Child => {
+			// this may be wrong idk how to make the arguments not include the path and im too tired to figure out rn
+			match nix::unistd::execv(fixedpath, &fixedargs) {
+				Ok(_) => std::process::exit(0),
+				Err(error) => {
+					eprintln!("Forked Child process failed: {}", error);
+					std::process::exit(1);
+				}
+			}			
+		}
+
+		nix::unistd::ForkResult::Parent { child } => {
+			nix::sys::wait::waitpid(child, None)?;
+			return Ok(child.as_raw() as usize);
+		}
+	}
 }
