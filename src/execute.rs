@@ -1,21 +1,20 @@
 use std::ffi::CStr;
 use std::ffi::CString;
 
-pub fn execute(path: Vec<String>) -> Result<usize, nix::Error> {
+pub fn execute(path: String, args: Vec<String>) -> Result<usize, nix::Error> {
 	let mut keepthecstringsalive: Vec<CString> = Vec::new();
 
-	for arg in path {
+	for arg in args {
 		let cstring = CString::new(arg).map_err(|_| nix::errno::Errno::EINVAL)?;
 			
 		keepthecstringsalive.push(cstring);
 	}
 
-	let fixedpathref = keepthecstringsalive[0].clone();
+	let fixedpathref = CString::new(path).map_err(|_| nix::errno::Errno::EINVAL)?;
 	let fixedpath = fixedpathref.as_c_str();
 
-	keepthecstringsalive.drain(..2);
-
 	let mut fixedargs: Vec<&CStr> = Vec::new();
+	fixedargs.push(fixedpath);
 
 	for arg in &keepthecstringsalive {
 		fixedargs.push(arg.as_c_str());
@@ -25,7 +24,7 @@ pub fn execute(path: Vec<String>) -> Result<usize, nix::Error> {
 
 	match pid {
 		nix::unistd::ForkResult::Child => {
-			// this may be wrong idk how to make the arguments not include the path and im too tired to figure out rn
+			// first argument is path
 			match nix::unistd::execv(fixedpath, &fixedargs) {
 				Ok(_) => std::process::exit(0),
 				Err(error) => {

@@ -22,10 +22,16 @@ fn main() {
             _ => {println!("{}: command not found\n", args[0]); continue}
         };
 
-	let mut command: Vec<String> = Vec::new();
-	command.push(path_to_cmd);
-	command.append(&mut args);
+        args.drain(0..1);
+        
+        // TEST PRINTS IGNORE
+        //
+        // println!("Executing command: {}",path_to_cmd);
+        //
+        // for arg in &args {
+        //     println!("Argument: {}", arg);
+        // }
 
-        execute::execute(command);
+        execute::execute(path_to_cmd,args);
     }
 }
