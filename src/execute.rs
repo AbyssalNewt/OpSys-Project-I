@@ -19,7 +19,7 @@ pub fn execute(args: Vec<String>) -> Option<usize> {
 
         Parent { child } => {
             waitpid(child, None).unwrap();
-            return Some(child.as_raw() as usize);
+            Some(child.as_raw() as usize)
         }
     }
 }
