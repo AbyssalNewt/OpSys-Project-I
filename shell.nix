@@ -5,11 +5,13 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [
     rustc
     cargo
+    bacon
+    rustfmt
+    clippy
     rust-analyzer
   ];
   buildInputs = [
   ];
 
-  # Tell compiler where to look for shared libraries
-  LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
+  RUST_SRC_PATH = "${rustPlatform.rustLibSrc}";
 }
