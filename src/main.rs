@@ -23,5 +23,6 @@ fn main() {
         };
 
         execute::execute(args).unwrap();
+        println!();
     }
 }
