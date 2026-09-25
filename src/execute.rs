@@ -17,7 +17,7 @@ pub fn execute(cmd: Command) {
         Child => {
             if !cmd.input.is_none()
             {
-                let in_fd = unsafe { open(cmd.input.unwrap().as_ptr(), O_RDONLY, S_IRUSR) };
+                let in_fd = cmd.input.unwrap();
 
                 if in_fd < 0 {
                     let err = Errno::last();
@@ -36,7 +36,7 @@ pub fn execute(cmd: Command) {
             }
             if !cmd.output.is_none()
             {
-                let out_fd = unsafe{ open(cmd.output.unwrap().as_ptr(), O_WRONLY | O_TRUNC | O_CREAT, 0o600)};
+                let out_fd = cmd.output.unwrap();
 
                 if out_fd < 0 {
                     let err = Errno::last();

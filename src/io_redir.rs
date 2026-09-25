@@ -1,24 +1,23 @@
-use std::{env, ffi::{CString}};
+use std::{env, ffi::CString};
+use nix::libc::{open, O_RDONLY, S_IRUSR, O_WRONLY, O_TRUNC, O_CREAT};
 
 pub struct Command {
     pub(crate) args: Vec<String>,
-    pub(crate) input: Option<CString>,
-    pub(crate) output: Option<CString>
+    pub(crate) input: Option<nix::libc::c_int>,
+    pub(crate) output: Option<nix::libc::c_int>,
 }
 pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
-    
-    let mut input : Option<CString> = None;
-    let mut output : Option<CString> = None;
-    let mut new_args : Option<Vec<String>> = None;
+    let mut input: Option<nix::libc::c_int> = None;
+    let mut output: Option<nix::libc::c_int> = None;
+    let mut new_args: Option<Vec<String>> = None;
 
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "<" => {
-
                 if !input.is_none() {
                     //Throw error if a second '<' is found.
-                    return Err("Error: extra input redirector".to_string())
+                    return Err("Error: extra input redirector".to_string());
                 }
 
                 if input.is_none() && output.is_none() {
@@ -26,19 +25,25 @@ pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
                     new_args = Some(args[..i].to_vec());
                 }
 
-                if args[i+1].starts_with("~") {
-                    let input_string : CString = CString::new(env::var("HOME").unwrap_or_default() + "/" + args[i+1].as_str()).unwrap();
-                    input = Some(input_string);
-                }
-                else if !args[i+1].starts_with("/") {
+                if args[i + 1].starts_with("~") {
+                    let input_string: CString = CString::new(
+                        env::var("HOME").unwrap_or_default() + "/" + args[i + 1].as_str(),
+                    )
+                    .unwrap();
+                    input =
+                        Some(unsafe { open(input_string.as_ptr(), O_RDONLY, S_IRUSR) });
+                } else if !args[i + 1].starts_with("/") {
                     //The file path is a relative path, so we are adding the cwd to it.
-                    let input_string : CString = CString::new(env::var("PWD").unwrap() + "/" + args[i+1].as_str()).unwrap();
-                    input = Some(input_string);
-                }
-                else {
+                    let input_string: CString =
+                        CString::new(env::var("PWD").unwrap() + "/" + args[i + 1].as_str())
+                            .unwrap();
+                    input =
+                        Some(unsafe { open(input_string.as_ptr(), O_RDONLY, S_IRUSR) });
+                } else {
                     //The file path is an absolute path, so we can take it as it is.
-                    let input_string : CString = CString::new(args[i+1].clone()).unwrap();
-                    input = Some(input_string);
+                    let input_string: CString = CString::new(args[i + 1].clone()).unwrap();
+                    input =
+                        Some(unsafe { open(input_string.as_ptr(), O_RDONLY, S_IRUSR) });
                 }
                 /* This is actually a race condition! We will check for errors when opening the file.
                 let consume_input = input.clone();
@@ -49,30 +54,50 @@ pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
                     return Err("Error: input file is not readable.".to_string());
                 }*/
                 i += 1;
-            },
+            }
             ">" => {
                 //Behavior largely the same as for the "<" case.
                 if !output.is_none() {
-                    return Err("Error: extra output redirector".to_string())
+                    return Err("Error: extra output redirector".to_string());
                 }
 
-                if input.is_none() && output.is_none()
-                {
+                if input.is_none() && output.is_none() {
                     new_args = Some(args[..i].to_vec());
                 }
 
-                if args[i+1].starts_with("~") {
-                    let output_string : CString = CString::new(env::var("HOME").unwrap_or_default() + "/" + args[i+1].as_str()).unwrap();
-                    output = Some(output_string);
-                }
-                else if !args[i+1].starts_with("/") {
+                if args[i + 1].starts_with("~") {
+                    let output_string: CString = CString::new(
+                        env::var("HOME").unwrap_or_default() + "/" + args[i + 1].as_str(),
+                    )
+                    .unwrap();
+                    output = Some(unsafe {
+                        open(
+                            output_string.as_ptr(),
+                            O_WRONLY | O_TRUNC | O_CREAT,
+                            0o600,
+                        )
+                    });
+                } else if !args[i + 1].starts_with("/") {
                     //The file path is a relative path, so we are adding the cwd to it.
-                    let output_string : CString = CString::new(env::var("PWD").unwrap() + "/" + args[i+1].as_str()).unwrap();
-                    output = Some(output_string);
-                }
-                else {
-                    let output_string : CString = CString::new(args[i+1].clone()).unwrap();
-                    output = Some(output_string);
+                    let output_string: CString =
+                        CString::new(env::var("PWD").unwrap() + "/" + args[i + 1].as_str())
+                            .unwrap();
+                    output = Some(unsafe {
+                        open(
+                            output_string.as_ptr(),
+                            O_WRONLY | O_TRUNC | O_CREAT,
+                            0o600,
+                        )
+                    });
+                } else {
+                    let output_string: CString = CString::new(args[i + 1].clone()).unwrap();
+                    output = Some(unsafe {
+                        open(
+                            output_string.as_ptr(),
+                            O_WRONLY | O_TRUNC | O_CREAT,
+                            0o600,
+                        )
+                    });
                 }
 
                 /* While checking for an error would be good, this is actually a race condition
@@ -87,16 +112,22 @@ pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
                 }
                 */
                 i += 1;
-            },
-            _  => ()
+            }
+            _ => (),
         }
         i += 1;
     }
 
-    match new_args.is_none()
-    {
-        true => Ok(Command {args, input, output}),
-        false => Ok(Command {args: new_args.unwrap_or_default(), input, output})
+    match new_args.is_none() {
+        true => Ok(Command {
+            args,
+            input,
+            output,
+        }),
+        false => Ok(Command {
+            args: new_args.unwrap_or_default(),
+            input,
+            output,
+        }),
     }
 }
-
