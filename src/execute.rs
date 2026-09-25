@@ -1,10 +1,13 @@
 use std::{str::FromStr, ffi::{CString}};
+use nix::errno::Errno;
+use nix::libc::{open, STDIN_FILENO, O_RDONLY, S_IRUSR, dup2, close, STDOUT_FILENO, O_WRONLY, O_TRUNC, O_CREAT, _exit};
 use nix::unistd::{fork, execv, ForkResult::{Child, Parent}};
 use nix::sys::wait::waitpid;
+use crate::io_redir::Command;
 
-pub fn execute(args: Vec<String>) -> Option<usize> {
+pub fn execute(cmd: Command) {
     // Vec<String> -> Vec<CString>
-    let cstr_args: Vec<CString> = args.iter()
+    let cstr_args: Vec<CString> = cmd.args.iter()
         .map(|x| CString::from_str(x).unwrap())
         .collect();
 
@@ -12,14 +15,52 @@ pub fn execute(args: Vec<String>) -> Option<usize> {
 
     match pid {
         Child => {
+            if !cmd.input.is_none()
+            {
+                let in_fd = unsafe { open(cmd.input.unwrap().as_ptr(), O_RDONLY, S_IRUSR) };
+
+                if in_fd < 0 {
+                    let err = Errno::last();
+                    match err{
+                        Errno::ENOENT => println!("File not found"),
+                        Errno::EACCES => println!("Permission denied"),
+                        _ => println!("Error executing command: {}", err),
+                    }
+                    unsafe { _exit(1); }
+                }
+
+                unsafe {
+                    dup2(in_fd, STDIN_FILENO);
+                    close(in_fd);
+                }
+            }
+            if !cmd.output.is_none()
+            {
+                let out_fd = unsafe{ open(cmd.output.unwrap().as_ptr(), O_WRONLY | O_TRUNC | O_CREAT, 0o600)};
+
+                if out_fd < 0 {
+                    let err = Errno::last();
+                    match err{
+                        Errno::ENOENT => println!("File not found"),
+                        Errno::EACCES => println!("Permission denied"),
+                        _ => println!("Error executing command: {}", err),
+                    }
+                    unsafe { _exit(1); }
+                }
+                unsafe {
+                    dup2(out_fd, STDOUT_FILENO);
+                    close(out_fd);
+                }
+            }
+
             // first argument is path
             execv(cstr_args[0].as_c_str(), &cstr_args).unwrap();
-            None
+
         }
 
         Parent { child } => {
             waitpid(child, None).unwrap();
-            Some(child.as_raw() as usize)
+
         }
     }
 }

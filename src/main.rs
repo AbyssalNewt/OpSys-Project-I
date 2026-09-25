@@ -33,7 +33,8 @@ fn main() {
 
         //println!("Command entered: {}, input file: {}, output file: {}", cmd.args[0], cmd.input.unwrap_or("N/A".to_string()), cmd.output.unwrap_or("N/A".to_string()));
 
-        execute::execute(cmd.args).unwrap();
+        execute::execute(cmd);
+
 
 
         println!();
