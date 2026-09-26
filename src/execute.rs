@@ -15,6 +15,7 @@ pub fn execute(mut cmds: Vec<Command>) {
         cmds[i] = io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output).unwrap();
         i += 1;
     }
+    for cmd in &cmds { println!("{:?}, {:?}, {:?}", cmd.args, cmd.input, cmd.output); }
 
     let mut pid_array: Vec<nix::unistd::Pid> = Vec::new();
 
@@ -73,11 +74,16 @@ pub fn execute(mut cmds: Vec<Command>) {
                     }
                 }
 
-                // first argument is path
+                for l in i*2+3..=2*cmds.len() {
+                    unsafe{ close(l as i32); }
+                }
+
                 execv(cstr_args[0].as_c_str(), &cstr_args).unwrap();
             }
 
             Parent { child } => {
+                if let Some(input) = cmd.input { unsafe {close(input);} }
+                if let Some(output) = cmd.output { unsafe {close(output);} }
                 pid_array.push(child);
             }
         }
