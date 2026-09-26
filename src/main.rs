@@ -51,7 +51,7 @@ fn main() {
                 (output, input) = (pipe_args[0], pipe_args[1]);
 
                 println!("{input:?}, {output:?}");
-                stupid.extend(args[lastpipe..i - 1].iter().cloned());
+                stupid.extend(args[lastpipe+1..i].iter().cloned());
                 cmds.push(io_redir::Command {
                     args: stupid,
                     input: last_out,
