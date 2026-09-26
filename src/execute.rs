@@ -16,6 +16,10 @@ pub fn execute(cmds: Vec<Command>) {
             .iter()
             .map(|x| CString::from_str(x).unwrap())
             .collect();
+        
+        let result = io_redir::io_parse(cmd.args).unwrap();
+        // TODO: make pipe somehow connect previous command to next command except for first pipe
+        // which can be a file input and last pipe which can be a file output
 
         let pid = unsafe { fork().unwrap() };
 

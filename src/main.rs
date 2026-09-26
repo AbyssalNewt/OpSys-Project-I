@@ -31,19 +31,19 @@ fn main() {
         let mut cmds: Vec<io_redir::Command> = Vec::new();
         let mut lastpipe = 0;
 
-        for (i, arg) in args.iter_mut().enumerate() {
+        for (i, arg) in args.iter().enumerate() {
+            let command = match path_search::path_search(&args[lastpipe]) {
+                Some(t) => t,
+                _ => {
+                    println!("{}: command not found\n", args[lastpipe]);
+                    continue;
+                }
+            };
+            let mut stupid = vec![command];
+            stupid.extend(args[lastpipe .. i-1].iter().cloned());
             if arg == "|" {
                 cmds.push(io_redir::Command {
-                    args: {
-                        vec![match path_search::path_search(&args[lastpipe]) {
-                            Some(t) => t,
-                            _ => {
-                                println!("{}: command not found\n", args[lastpipe]);
-                                continue;
-                            }
-                        }]
-                        .append(args[lastpipe..i - 1].to_vec())
-                    },
+                    args: stupid,
                     input: None,
                     output: None,
                 });
