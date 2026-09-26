@@ -50,7 +50,6 @@ fn main() {
                 unsafe {nix::libc::pipe(&mut pipe_args[0]);}
                 (output, input) = (pipe_args[0], pipe_args[1]);
 
-                println!("{input:?}, {output:?}");
                 stupid.extend(args[lastpipe+1..i].iter().cloned());
                 cmds.push(io_redir::Command {
                     args: stupid,

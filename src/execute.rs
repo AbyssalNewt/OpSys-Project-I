@@ -15,7 +15,6 @@ pub fn execute(mut cmds: Vec<Command>) {
         cmds[i] = io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output).unwrap();
         i += 1;
     }
-    for cmd in &cmds { println!("{:?}, {:?}, {:?}", cmd.args, cmd.input, cmd.output); }
 
     let mut pid_array: Vec<nix::unistd::Pid> = Vec::new();
 
