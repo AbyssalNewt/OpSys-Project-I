@@ -1,4 +1,4 @@
-use std::{env, ffi::CString};
+use std::{env, ffi::CString, process::Output};
 use nix::libc::{open, O_RDONLY, S_IRUSR, O_WRONLY, O_TRUNC, O_CREAT};
 
 pub struct Command {
@@ -6,19 +6,20 @@ pub struct Command {
     pub(crate) input: Option<nix::libc::c_int>,
     pub(crate) output: Option<nix::libc::c_int>,
 }
-pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
-    let mut input: Option<nix::libc::c_int> = None;
-    let mut output: Option<nix::libc::c_int> = None;
+pub fn io_parse(args: Vec<String>, input: Option<nix::libc::c_int>, output: Option<nix::libc::c_int>) -> Result<Command, String> {
+    let mut input: Option<nix::libc::c_int> = input;
+    let mut output: Option<nix::libc::c_int> = output;
+    let args = args;
     let mut new_args: Option<Vec<String>> = None;
 
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "<" => {
-                if !input.is_none() {
+                //if !input.is_none() {
                     //Throw error if a second '<' is found.
-                    return Err("Error: extra input redirector".to_string());
-                }
+                  //  return Err("Error: extra input redirector".to_string());
+                //}
 
                 if input.is_none() && output.is_none() {
                     //The args of the command are separated from the I/O redirection upon finding I/O redirection
@@ -50,9 +51,9 @@ pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
             }
             ">" => {
                 //Behavior largely the same as for the "<" case.
-                if !output.is_none() {
-                    return Err("Error: extra output redirector".to_string());
-                }
+               // if !output.is_none() {
+                 //   return Err("Error: extra output redirector".to_string());
+                //}
 
                 if input.is_none() && output.is_none() {
                     new_args = Some(args[..i].to_vec());

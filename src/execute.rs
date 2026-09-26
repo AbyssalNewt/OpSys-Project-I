@@ -1,65 +1,89 @@
-use std::{str::FromStr, ffi::{CString}};
+use crate::io_redir::{Command, io_parse};
 use nix::errno::Errno;
-use nix::libc::{STDIN_FILENO, dup2, close, STDOUT_FILENO, _exit};
-use nix::unistd::{fork, execv, ForkResult::{Child, Parent}};
+use nix::libc::{_exit, STDIN_FILENO, STDOUT_FILENO, close, dup2};
 use nix::sys::wait::waitpid;
-use crate::io_redir::Command;
+use nix::unistd::{
+    ForkResult::{Child, Parent},
+    execv, fork,
+};
+use std::os::fd::{AsRawFd, IntoRawFd};
+use std::{ffi::CString, str::FromStr};
 
-pub fn execute(cmd: Command) {
-    // Vec<String> -> Vec<CString>
-    let cstr_args: Vec<CString> = cmd.args.iter()
-        .map(|x| CString::from_str(x).unwrap())
-        .collect();
+pub fn execute(mut cmds: Vec<Command>) {
+    let mut i = 0;
+    while i < cmds.len() {
+        cmds[i] = io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output).unwrap();
+        i += 1;
+    }
 
-    let pid = unsafe { fork().unwrap() };
+    let mut pid_array: Vec<nix::unistd::Pid> = Vec::new();
 
-    match pid {
-        Child => {
-            if !cmd.input.is_none()
-            {
-                let in_fd = cmd.input.unwrap();
+    for (i, cmd) in cmds.iter_mut().enumerate() {
+        // Vec<String> -> Vec<CString>
+        let cstr_args: Vec<CString> = cmd
+            .args
+            .iter()
+            .map(|x| CString::from_str(x).unwrap())
+            .collect();
 
-                if in_fd < 0 {
-                    let err = Errno::last();
-                    match err{
-                        Errno::ENOENT => println!("File not found"),
-                        Errno::EACCES => println!("Permission denied"),
-                        _ => println!("Error executing command: {}", err),
+        // TODO: make pipe somehow connect previous command to next command except for first pipe
+        // which can be a file input and last pipe which can be a file output
+
+        let pid = unsafe { fork().unwrap() };
+
+        match pid {
+            Child => {
+                if !cmd.input.is_none() {
+                    let in_fd = cmd.input.unwrap();
+
+                    if in_fd < 0 {
+                        let err = Errno::last();
+                        match err {
+                            Errno::ENOENT => println!("File not found"),
+                            Errno::EACCES => println!("Permission denied"),
+                            _ => println!("Error executing command: {}", err),
+                        }
+                        unsafe {
+                            _exit(1);
+                        }
                     }
-                    unsafe { _exit(1); }
-                }
 
-                unsafe {
-                    dup2(in_fd, STDIN_FILENO);
-                    close(in_fd);
-                }
-            }
-            if !cmd.output.is_none()
-            {
-                let out_fd = cmd.output.unwrap();
-
-                if out_fd < 0 {
-                    let err = Errno::last();
-                    match err{
-                        Errno::EACCES => println!("Permission denied"),
-                        _ => println!("Error executing command: {}", err),
+                    unsafe {
+                        dup2(in_fd, STDIN_FILENO);
+                        close(in_fd);
                     }
-                    unsafe { _exit(1); }
                 }
-                unsafe {
-                    dup2(out_fd, STDOUT_FILENO);
-                    close(out_fd);
+                if !cmd.output.is_none() {
+                    let out_fd = cmd.output.unwrap();
+
+                    if out_fd < 0 {
+                        let err = Errno::last();
+                        match err {
+                            Errno::ENOENT => println!("File not found"),
+                            Errno::EACCES => println!("Permission denied"),
+                            _ => println!("Error executing command: {}", err),
+                        }
+                        unsafe {
+                            _exit(1);
+                        }
+                    }
+                    unsafe {
+                        dup2(out_fd, STDOUT_FILENO);
+                        close(out_fd);
+                    }
                 }
+
+                // first argument is path
+                execv(cstr_args[0].as_c_str(), &cstr_args).unwrap();
             }
 
-            // first argument is path
-            execv(cstr_args[0].as_c_str(), &cstr_args).unwrap();
-
+            Parent { child } => {
+                pid_array.push(child);
+            }
         }
+    }
 
-        Parent { child } => {
-            waitpid(child, None).unwrap();
-
-        }
+    for pid in pid_array {
+        waitpid(pid, None).unwrap();
     }
 }
