@@ -32,7 +32,7 @@ fn main() {
 
         let mut cmds: Vec<io_redir::Command> = Vec::new();
         let mut lastpipe = 0;
-        let mut last_out : Option<nix::libc::c_int> = None;
+        let mut last_out: Option<nix::libc::c_int> = None;
 
         for (i, arg) in args.iter().enumerate() {
             let command = match path_search::path_search(&args[lastpipe]) {
@@ -43,9 +43,10 @@ fn main() {
                 }
             };
             let mut stupid = vec![command];
-            let (input, output) = nix::unistd::pipe().unwrap();
             if arg == "|" {
-                stupid.extend(args[lastpipe .. i-1].iter().cloned());
+                let (input, output) = nix::unistd::pipe().unwrap();
+                println!("{input:?}, {output:?}");
+                stupid.extend(args[lastpipe..i - 1].iter().cloned());
                 cmds.push(io_redir::Command {
                     args: stupid,
                     input: last_out,
@@ -66,7 +67,11 @@ fn main() {
 
         if lastpipe == 0 {
             // no pipe emergency abort to check io redirection and run command
-            cmds.push(io_redir::Command { args, input:None, output:None});
+            cmds.push(io_redir::Command {
+                args,
+                input: None,
+                output: None,
+            });
         } else {
             cmds.push(io_redir::Command {
                 args: args[lastpipe..].to_vec(),
