@@ -85,6 +85,7 @@ fn main() {
         }
 
         execute::execute(cmds);
+        println!();
 
         //println!("Command entered: {}, input file: {}, output file: {}", cmd.args[0], cmd.input.unwrap_or("N/A".to_string()), cmd.output.unwrap_or("N/A".to_string()));
     }
