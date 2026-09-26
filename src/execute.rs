@@ -1,4 +1,4 @@
-use crate::io_redir::Command;
+use crate::io_redir::{Command, io_parse};
 use nix::errno::Errno;
 use nix::libc::{_exit, STDIN_FILENO, STDOUT_FILENO, close, dup2};
 use nix::sys::wait::waitpid;
@@ -6,18 +6,26 @@ use nix::unistd::{
     ForkResult::{Child, Parent},
     execv, fork,
 };
+use std::os::fd::{AsRawFd, IntoRawFd};
 use std::{ffi::CString, str::FromStr};
 
-pub fn execute(cmds: Vec<Command>) {
-    for cmd in cmds {
+pub fn execute(mut cmds: Vec<Command>) {
+    let mut i = 0;
+    while i < cmds.len() {
+        cmds[i] = io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output).unwrap();
+        i += 1;
+    }
+
+    let mut pid_array: Vec<nix::unistd::Pid> = Vec::new();
+
+    for (i, cmd) in cmds.iter_mut().enumerate() {
         // Vec<String> -> Vec<CString>
         let cstr_args: Vec<CString> = cmd
             .args
             .iter()
             .map(|x| CString::from_str(x).unwrap())
             .collect();
-        
-        let result = io_redir::io_parse(cmd.args).unwrap();
+
         // TODO: make pipe somehow connect previous command to next command except for first pipe
         // which can be a file input and last pipe which can be a file output
 
@@ -70,8 +78,12 @@ pub fn execute(cmds: Vec<Command>) {
             }
 
             Parent { child } => {
-                waitpid(child, None).unwrap();
+                pid_array.push(child);
             }
         }
+    }
+
+    for pid in pid_array {
+        waitpid(pid, None).unwrap();
     }
 }

@@ -1,3 +1,5 @@
+use std::os::fd::IntoRawFd;
+
 use nix::libc::{STDIN_FILENO, STDOUT_FILENO};
 
 mod env_expansion;
@@ -30,6 +32,7 @@ fn main() {
 
         let mut cmds: Vec<io_redir::Command> = Vec::new();
         let mut lastpipe = 0;
+        let mut last_out : Option<nix::libc::c_int> = None;
 
         for (i, arg) in args.iter().enumerate() {
             let command = match path_search::path_search(&args[lastpipe]) {
@@ -40,14 +43,15 @@ fn main() {
                 }
             };
             let mut stupid = vec![command];
-            stupid.extend(args[lastpipe .. i-1].iter().cloned());
+            let (input, output) = nix::unistd::pipe().unwrap();
             if arg == "|" {
+                stupid.extend(args[lastpipe .. i-1].iter().cloned());
                 cmds.push(io_redir::Command {
                     args: stupid,
-                    input: None,
-                    output: None,
+                    input: last_out,
+                    output: Some(input.into_raw_fd()),
                 });
-
+                last_out = Some(output.into_raw_fd());
                 lastpipe = i + 1;
             }
         }
@@ -60,20 +64,13 @@ fn main() {
             }
         };
 
-        if (lastpipe == 0) {
+        if lastpipe == 0 {
             // no pipe emergency abort to check io redirection and run command
-            let cmd: io_redir::Command = match io_redir::io_parse(args) {
-                Ok(com) => com,
-                Err(err) => {
-                    println!("{}", err);
-                    continue;
-                }
-            };
-            cmds.push(cmd);
+            cmds.push(io_redir::Command { args, input:None, output:None});
         } else {
             cmds.push(io_redir::Command {
                 args: args[lastpipe..].to_vec(),
-                input: None,
+                input: last_out,
                 output: None,
             });
         }
