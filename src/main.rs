@@ -1,6 +1,6 @@
 use std::os::fd::IntoRawFd;
 
-use nix::libc::{STDIN_FILENO, STDOUT_FILENO};
+use nix::libc::{c_int};
 
 mod env_expansion;
 mod path_search;
@@ -32,7 +32,7 @@ fn main() {
 
         let mut cmds: Vec<io_redir::Command> = Vec::new();
         let mut lastpipe = 0;
-        let mut last_out: Option<nix::libc::c_int> = None;
+        let mut last_out: Option<c_int> = None;
 
         for (i, arg) in args.iter().enumerate() {
             let command = match path_search::path_search(&args[lastpipe]) {
@@ -44,7 +44,12 @@ fn main() {
             };
             let mut stupid = vec![command];
             if arg == "|" {
-                let (input, output) = nix::unistd::pipe().unwrap();
+                let mut pipe_args : [c_int;2] = [0;2];
+                let input : c_int;
+                let output: c_int;
+                unsafe {nix::libc::pipe(&mut pipe_args[0]);}
+                (output, input) = (pipe_args[0], pipe_args[1]);
+
                 println!("{input:?}, {output:?}");
                 stupid.extend(args[lastpipe..i - 1].iter().cloned());
                 cmds.push(io_redir::Command {
