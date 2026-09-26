@@ -1,6 +1,6 @@
 use std::{str::FromStr, ffi::{CString}};
 use nix::errno::Errno;
-use nix::libc::{open, STDIN_FILENO, O_RDONLY, S_IRUSR, dup2, close, STDOUT_FILENO, O_WRONLY, O_TRUNC, O_CREAT, _exit};
+use nix::libc::{STDIN_FILENO, dup2, close, STDOUT_FILENO, _exit};
 use nix::unistd::{fork, execv, ForkResult::{Child, Parent}};
 use nix::sys::wait::waitpid;
 use crate::io_redir::Command;
@@ -41,7 +41,6 @@ pub fn execute(cmd: Command) {
                 if out_fd < 0 {
                     let err = Errno::last();
                     match err{
-                        Errno::ENOENT => println!("File not found"),
                         Errno::EACCES => println!("Permission denied"),
                         _ => println!("Error executing command: {}", err),
                     }

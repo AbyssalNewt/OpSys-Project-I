@@ -45,14 +45,7 @@ pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
                     input =
                         Some(unsafe { open(input_string.as_ptr(), O_RDONLY, S_IRUSR) });
                 }
-                /* This is actually a race condition! We will check for errors when opening the file.
-                let consume_input = input.clone();
-                let in_path : CString = CString::new(consume_input.unwrap()).unwrap();
-                let inp_cstr = in_path.as_c_str();
-                if access(inp_cstr, AccessFlags::R_OK) != Ok(()) {
-                    //Checking if the file is readable. The 3 previous lines are shit.
-                    return Err("Error: input file is not readable.".to_string());
-                }*/
+
                 i += 1;
             }
             ">" => {
@@ -100,17 +93,6 @@ pub fn io_parse(args: Vec<String>) -> Result<Command, String> {
                     });
                 }
 
-                /* While checking for an error would be good, this is actually a race condition
-                let consume_output = output.clone();
-                let out_path : CString = CString::new(consume_output.unwrap()).unwrap();
-                let out_cstr = out_path.as_c_str();
-                match access(out_cstr, AccessFlags::F_OK | AccessFlags::W_OK)
-                {
-                    Err(nix::errno::Errno::EACCES) => return Err("Error: output file is not writable.".to_string()),
-                    Ok(()) => (),
-                    Err(_) => return Err("Error: Unknown error when checking output file access".to_string())
-                }
-                */
                 i += 1;
             }
             _ => (),
