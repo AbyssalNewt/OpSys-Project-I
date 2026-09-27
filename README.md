@@ -42,6 +42,8 @@
     - Shell-ception - Mason Simmons
 
 ## File Listing
+> [!NOTE]
+> shell.nix and .envrc were used to mirror development environments on NixOS; they can be ignored.
 
 - src
     - env_expansion.rs
