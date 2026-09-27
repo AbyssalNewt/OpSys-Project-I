@@ -1,6 +1,9 @@
+use std::env;
+use std::env::current_dir;
+use std::ffi::{c_char, CString};
 use std::os::fd::IntoRawFd;
-
-use nix::libc::{c_int};
+use nix::errno::Errno;
+use nix::libc::{c_int, chdir, getcwd, getenv, setenv};
 
 mod env_expansion;
 mod path_search;
@@ -26,7 +29,13 @@ fn main() {
 
         // replace with the built-ins later
         match args[0].as_str() {
-            "exit" => break,
+            "exit" => {break
+            },
+            "cd" => {
+                cd(&mut args);
+                continue;
+
+            },
             _ => (),
         }
 
@@ -89,4 +98,38 @@ fn main() {
 
         //println!("Command entered: {}, input file: {}, output file: {}", cmd.args[0], cmd.input.unwrap_or("N/A".to_string()), cmd.output.unwrap_or("N/A".to_string()));
     }
+}
+
+fn cd(args: &mut Vec<String>) {
+
+
+    if args.len() > 2 {
+        println!("cd: too many arguments");
+        return;
+    }
+
+    let new_dir : *const c_char = if args.len() == 1 {
+        CString::new(env::var("HOME").unwrap_or_default()).unwrap().into_raw()
+    } else {
+        //TODO: resolve ".." and "." here
+        CString::new(args[1].clone()).unwrap().into_raw()
+    };
+    unsafe {
+
+
+        let result = chdir(new_dir);
+        if result == 0 {
+
+            setenv(CString::new("PWD").unwrap().into_raw(), new_dir, 1);
+        } else {
+            let err = Errno::last();
+            match err
+            {
+                Errno::EACCES => println!("{}: Permission denied.", args[1]),
+                Errno::ENOENT => println!("cd: {}: No such file or directory", args[1]),
+                Errno::ENOTDIR => println!("cd: {}: Not a directory", args[1]),
+                _ => println!("cd: Unspecified error {}", args[1]),
+            }
+        }
+    };
 }
