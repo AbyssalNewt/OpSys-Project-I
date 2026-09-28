@@ -1,7 +1,8 @@
 use std::env;
 use std::env::current_dir;
-use std::ffi::{c_char, CString};
+use std::ffi::{c_char, CString, CStr};
 use std::os::fd::IntoRawFd;
+use std::str::FromStr;
 use nix::errno::Errno;
 use nix::libc::{c_int, chdir, getcwd, getenv, setenv};
 
@@ -108,19 +109,45 @@ fn cd(args: &mut Vec<String>) {
         return;
     }
 
-    let new_dir : *const c_char = if args.len() == 1 {
-        CString::new(env::var("HOME").unwrap_or_default()).unwrap().into_raw()
+    let target_path: *const c_char = if args.len() == 1 {
+        CString::new(env::var("HOME").unwrap_or_default()).unwrap()
     } else {
-        //TODO: resolve ".." and "." here
-        CString::new(args[1].clone()).unwrap().into_raw()
+        let full = if args[1].starts_with('/'){
+            &mut args[1]
+        }
+        else{
+
+            let cwd = unsafe { getenv(CString::from_str("PWD").unwrap().as_ptr()) };
+            let c_str = unsafe { CStr::from_ptr(cwd) };
+            let cwd_str = c_str.to_str().unwrap();
+            &mut format!("{}/{}", cwd_str, args[1])
+        };
+        let mut stack: Vec<&str> = Vec::new();
+
+        for segment in full.split("/") {
+            match segment{
+                "" | "." => {},
+                ".." => {stack.pop();},
+                name => {stack.push(name);}
+            }
+        }
+
+        if stack.is_empty(){
+            CString::new("/".to_string()).unwrap().as_ptr()
+        }
+        else {
+            CString::new("/".to_string() + stack.join("/").as_str()).unwrap().as_ptr()
+        }
+
+
     };
     unsafe {
 
 
-        let result = chdir(new_dir);
+        let result = chdir(target_path);
         if result == 0 {
 
-            setenv(CString::new("PWD").unwrap().into_raw(), new_dir, 1);
+            setenv(CString::new("PWD").unwrap().as_ptr(), target_path, 1);
         } else {
             let err = Errno::last();
             match err
