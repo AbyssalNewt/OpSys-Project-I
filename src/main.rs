@@ -4,26 +4,70 @@ use std::os::fd::IntoRawFd;
 use std::str::FromStr;
 use nix::errno::Errno;
 use nix::libc::{c_int, chdir, getenv, setenv};
+use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
+use nix::unistd::Pid;
 
 mod env_expansion;
 mod path_search;
 mod prompt;
 mod tilde_expansion;
-
 mod execute;
 mod io_redir;
 
+#[derive(Clone)]
+pub struct JobTracker {
+    last_job:i32, //or c_int or whatever
+    cur_command:String,
+    jobs : Vec<(i32, nix::unistd::Pid, String)> //job number, pid, and command
+}
+impl JobTracker {
+    fn push(&mut self, pid :nix::unistd::Pid) {
+        self.last_job += 1;
+        self.jobs.push((self.last_job,pid,self.cur_command.clone()));
+    }
+}
+
 fn main() {
 
-    let job_tracker = JobTracker{
+    let mut job_tracker = JobTracker{
         last_job : 0,
+        cur_command : String::new(),
         jobs : Vec::new()
     };
 
     let mut command_history: Vec<Vec<String>> = Vec::new();
 
+    let mut bg_flag : bool = false;
+
     loop {
+        loop {
+            match waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
+                Ok(WaitStatus::Exited(_pid, status)) => {
+                    if let Some(job_index) = job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid) {
+                        println!("{} done: {}", job_tracker.jobs[job_index].0, job_tracker.jobs[job_index].2);
+                        job_tracker.jobs.remove(job_index);
+                    }
+                },
+                Ok(WaitStatus::Signaled(_pid, signal, core_dumped)) => {
+                    if let Some(job_index) = job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid) {
+                        println!("{} killed by {:?}", _pid, signal);
+                        job_tracker.jobs.remove(job_index);
+                    }
+                },
+                Ok(WaitStatus::StillAlive) => {
+                    //All background processes are active.
+                    break;
+                },
+                Err(nix::errno::Errno::ECHILD) => {
+                    // No child processes to check.
+                    break;
+                },
+                _ => {}
+            }
+        }
+
         let mut args = prompt::prompt();
+        job_tracker.cur_command = args.join(" ");
         env_expansion::env_expansion(&mut args);
         tilde_expansion::tilde_expansion(&mut args);
 
@@ -35,10 +79,17 @@ fn main() {
             }
         };*/
 
+        if !args.is_empty() && args.last().unwrap() == "&"{
+            bg_flag = true;
+            args.pop();
+            job_tracker.cur_command.pop();
+        }
+
         // replace with the built-ins later
         match args[0].as_str() {
             "exit" => {
-                //wait for background processes in progress
+
+                //TODO: waitpid on the jobs list until they all finish
 
                 if command_history.is_empty()
                 {
@@ -145,7 +196,9 @@ fn main() {
             });
         }
 
-        execute::execute(cmds);
+        //TODO: determine whether to add command to command history from execute::execute
+        execute::execute(cmds, bg_flag, &mut job_tracker);
+        bg_flag = false;
         println!();
 
         //println!("Command entered: {}, input file: {}, output file: {}", cmd.args[0], cmd.input.unwrap_or("N/A".to_string()), cmd.output.unwrap_or("N/A".to_string()));
@@ -221,14 +274,3 @@ fn cd(args: &mut Vec<String>) -> bool {
     }
 }
 
-#[derive(Clone)]
-pub struct JobTracker {
-    last_job:i32, //or c_int or whatever
-    jobs : Vec<(i32, c_int, String)>
-}
-impl JobTracker {
-    fn push(&mut self, pid :c_int, command: String) {
-        self.last_job += 1;
-        self.jobs.push((self.last_job,pid,command));
-    }
-}

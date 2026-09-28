@@ -6,10 +6,11 @@ use nix::unistd::{
     ForkResult::{Child, Parent},
     execv, fork,
 };
-use std::os::fd::{AsRawFd, IntoRawFd};
-use std::{ffi::CString, str::FromStr};
 
-pub fn execute(mut cmds: Vec<Command>) {
+use std::{ffi::CString, str::FromStr};
+use crate::JobTracker;
+
+pub fn execute(mut cmds: Vec<Command>, bg_flag : bool, job_tracker: &mut JobTracker) {
     let mut i = 0;
     while i < cmds.len() {
         cmds[i] = io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output).unwrap();
@@ -25,9 +26,6 @@ pub fn execute(mut cmds: Vec<Command>) {
             .iter()
             .map(|x| CString::from_str(x).unwrap())
             .collect();
-
-        // TODO: make pipe somehow connect previous command to next command except for first pipe
-        // which can be a file input and last pipe which can be a file output
 
         let pid = unsafe { fork().unwrap() };
 
@@ -87,8 +85,13 @@ pub fn execute(mut cmds: Vec<Command>) {
             }
         }
     }
-
-    for pid in pid_array {
-        waitpid(pid, None).unwrap();
+    if bg_flag{
+        job_tracker.push(*pid_array.last().unwrap());
+        println!("{} {}", job_tracker.jobs.last().unwrap().0, job_tracker.jobs.last().unwrap().1);
+    }
+    else{
+        for pid in pid_array {
+            waitpid(pid, None).unwrap();
+        }
     }
 }
