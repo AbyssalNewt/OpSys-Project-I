@@ -1,3 +1,10 @@
+mod env_expansion;
+mod execute;
+mod io_redir;
+mod path_search;
+mod prompt;
+mod tilde_expansion;
+
 use nix::{
     errno::Errno,
     libc::{c_int, chdir, getenv, setenv},
@@ -10,12 +17,6 @@ use std::{
     os::fd::IntoRawFd,
     str::FromStr,
 };
-mod env_expansion;
-mod execute;
-mod io_redir;
-mod path_search;
-mod prompt;
-mod tilde_expansion;
 
 #[derive(Clone)]
 pub struct JobTracker {
