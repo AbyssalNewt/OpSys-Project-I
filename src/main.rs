@@ -11,6 +11,7 @@ use nix::{
     sys::wait::{WaitPidFlag, WaitStatus, waitpid},
     unistd::Pid,
 };
+
 use std::{
     env,
     ffi::{CStr, CString},
@@ -19,16 +20,26 @@ use std::{
 };
 
 #[derive(Clone)]
+pub struct Job {
+    num: i32,
+    pid: Pid,
+    cmd: String,
+}
+
+#[derive(Clone)]
 pub struct JobTracker {
     last_job: i32, //or c_int or whatever
     cur_command: String,
-    jobs: Vec<(i32, nix::unistd::Pid, String)>, //job number, pid, and command
+    jobs: Vec<Job>, //job number, pid, and command
 }
 impl JobTracker {
     fn push(&mut self, pid: nix::unistd::Pid) {
         self.last_job += 1;
-        self.jobs
-            .push((self.last_job, pid, self.cur_command.clone()));
+        self.jobs.push(Job {
+            num: self.last_job,
+            pid,
+            cmd: self.cur_command.clone(),
+        });
     }
 }
 
@@ -40,41 +51,33 @@ fn main() {
     };
 
     let mut command_history: Vec<Vec<String>> = Vec::new();
-
     let mut bg_flag: bool = false;
 
     loop {
-        loop {
-            match waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
-                Ok(WaitStatus::Exited(_pid, status)) => {
-                    if let Some(job_index) =
-                        job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid)
-                    {
-                        println!(
-                            "{} done: {}",
-                            job_tracker.jobs[job_index].0, job_tracker.jobs[job_index].2
-                        );
-                        job_tracker.jobs.remove(job_index);
-                    }
-                }
-                Ok(WaitStatus::Signaled(_pid, signal, core_dumped)) => {
-                    if let Some(job_index) =
-                        job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid)
-                    {
-                        println!("{} killed by {:?}", _pid, signal);
-                        job_tracker.jobs.remove(job_index);
-                    }
-                }
-                Ok(WaitStatus::StillAlive) => {
-                    //All background processes are active.
-                    break;
-                }
-                Err(nix::errno::Errno::ECHILD) => {
-                    // No child processes to check.
-                    break;
-                }
-                _ => {}
+        // Check for done jobs
+        while let Ok(wait_status) = waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
+            // No jobs done
+            if wait_status == WaitStatus::StillAlive {
+                break;
             }
+            // Find index of done job
+            let i = job_tracker
+                .jobs
+                .iter()
+                .position(|j| j.pid == wait_status.pid().unwrap())
+                .unwrap();
+            // Get correct status message
+            match wait_status {
+                WaitStatus::Exited(_pid, ..) => println!(
+                    "{} done: {}",
+                    job_tracker.jobs[i].num, job_tracker.jobs[i].cmd
+                ),
+                WaitStatus::Signaled(_pid, signal, ..) => {
+                    println!("{} killed by {:?}", _pid, signal)
+                }
+                _ => (),
+            };
+            job_tracker.jobs.remove(i);
         }
 
         let mut args = prompt::prompt();
@@ -91,7 +94,7 @@ fn main() {
         match args[0].as_str() {
             "exit" => {
                 for job in job_tracker.jobs {
-                    waitpid(job.1, None).unwrap();
+                    waitpid(job.pid, None).unwrap();
                 }
 
                 if command_history.is_empty() {
@@ -126,7 +129,7 @@ fn main() {
                 } else {
                     println!("{:<8}| {:<8}|{}", "Job No.", "PID", "Command");
                     for job in job_tracker.jobs.iter() {
-                        println!("{:<8}  {:<8} {}", job.0, job.1, job.2);
+                        println!("{:<8}  {:<8} {}", job.num, job.pid, job.cmd);
                     }
                     command_history.push(args);
                 }

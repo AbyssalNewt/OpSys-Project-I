@@ -87,7 +87,7 @@ pub fn execute(mut cmds: Vec<Command>, bg_flag : bool, job_tracker: &mut JobTrac
     }
     if bg_flag{
         job_tracker.push(*pid_array.last().unwrap());
-        println!("{} {}", job_tracker.jobs.last().unwrap().0, job_tracker.jobs.last().unwrap().1);
+        println!("{} {}", job_tracker.jobs.last().unwrap().num, job_tracker.jobs.last().unwrap().pid);
     }
     else{
         for pid in pid_array {
