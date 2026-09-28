@@ -69,7 +69,7 @@ fn main() {
                 // Get correct status message
                 match wait_status {
                     WaitStatus::Exited(_pid, ..) => println!(
-                        "{} done: {}",
+                        "[{}]+ Done {}",
                         job_tracker.jobs[i].num, job_tracker.jobs[i].cmd
                     ),
                     WaitStatus::Signaled(_pid, signal, ..) => {
@@ -81,7 +81,7 @@ fn main() {
             }
         }
 
-        let (cur_command, mut args) = prompt::prompt();
+        let (mut cur_command, mut args) = prompt::prompt();
         env_expansion::env_expansion(&mut args);
         tilde_expansion::tilde_expansion(&mut args);
 
@@ -89,6 +89,8 @@ fn main() {
         if !args.is_empty() && args.last().unwrap() == "&" {
             bg_flag = true;
             args.pop();
+            cur_command.pop();
+            cur_command.pop();
         }
 
         match args[0].as_str() {
