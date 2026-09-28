@@ -28,17 +28,16 @@ pub struct Job {
 
 #[derive(Clone)]
 pub struct JobTracker {
-    last_job: i32, //or c_int or whatever
-    cur_command: String,
-    jobs: Vec<Job>, //job number, pid, and command
+    last_job: i32, 
+    jobs: Vec<Job>, 
 }
 impl JobTracker {
-    fn push(&mut self, pid: nix::unistd::Pid) {
+    fn push(&mut self, pid: Pid, cmd: String) {
         self.last_job += 1;
         self.jobs.push(Job {
             num: self.last_job,
             pid,
-            cmd: self.cur_command.clone(),
+            cmd
         });
     }
 }
@@ -46,7 +45,6 @@ impl JobTracker {
 fn main() {
     let mut job_tracker = JobTracker {
         last_job: 0,
-        cur_command: String::new(),
         jobs: Vec::new(),
     };
 
@@ -80,15 +78,14 @@ fn main() {
             job_tracker.jobs.remove(i);
         }
 
-        let mut args = prompt::prompt();
-        job_tracker.cur_command = args.join(" ");
+        let (cur_command, mut args) = prompt::prompt();
         env_expansion::env_expansion(&mut args);
         tilde_expansion::tilde_expansion(&mut args);
 
+        // Remove ampersand
         if !args.is_empty() && args.last().unwrap() == "&" {
             bg_flag = true;
             args.pop();
-            job_tracker.cur_command.pop();
         }
 
         match args[0].as_str() {

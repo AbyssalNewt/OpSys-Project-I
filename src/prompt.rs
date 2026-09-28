@@ -1,13 +1,13 @@
 use std::env;
-use std::io::{self,Write};
+use std::io::{self, Write};
 
-pub fn prompt() -> Vec<String> {
+pub fn prompt() -> (String, Vec<String>) {
     let user = env::var("USER").unwrap_or_else(|_| "unknown".to_string());
     let machine = env::var("MACHINE").unwrap_or_else(|_| "demanitus".to_string());
     let pwd = env::var("PWD").unwrap_or_else(|_| "unknown".to_string());
 
     io::stdout().flush().unwrap();
-    print!("{}@{}:{}> ",user,machine,pwd);
+    print!("{}@{}:{}> ", user, machine, pwd);
     io::stdout().flush().unwrap();
 
     let mut input = String::new();
@@ -15,8 +15,8 @@ pub fn prompt() -> Vec<String> {
 
     stdin.read_line(&mut input).unwrap();
 
-    input.trim()
-         .split(' ')
-         .map(|s| s.to_string())
-         .collect()
+    (
+        input.clone(),
+        input.trim().split(' ').map(|s| s.to_string()).collect(),
+    )
 }
