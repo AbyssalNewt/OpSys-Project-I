@@ -19,7 +19,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Job {
     num: i32,
     pid: Pid,
@@ -28,8 +28,8 @@ pub struct Job {
 
 #[derive(Clone)]
 pub struct JobTracker {
-    last_job: i32, 
-    jobs: Vec<Job>, 
+    last_job: i32,
+    jobs: Vec<Job>,
 }
 impl JobTracker {
     fn push(&mut self, pid: Pid, cmd: String) {
@@ -37,7 +37,7 @@ impl JobTracker {
         self.jobs.push(Job {
             num: self.last_job,
             pid,
-            cmd
+            cmd,
         });
     }
 }
@@ -58,24 +58,26 @@ fn main() {
             if wait_status == WaitStatus::StillAlive {
                 break;
             }
-            // Find index of done job
-            let i = job_tracker
+            // Find index of done job. Uses ifLet because waitpid(-1) includes
+            // jobs between pipes, not just the one we stored.
+            if let Some(i) = job_tracker
                 .jobs
                 .iter()
                 .position(|j| j.pid == wait_status.pid().unwrap())
-                .unwrap();
-            // Get correct status message
-            match wait_status {
-                WaitStatus::Exited(_pid, ..) => println!(
-                    "{} done: {}",
-                    job_tracker.jobs[i].num, job_tracker.jobs[i].cmd
-                ),
-                WaitStatus::Signaled(_pid, signal, ..) => {
-                    println!("{} killed by {:?}", _pid, signal)
-                }
-                _ => (),
-            };
-            job_tracker.jobs.remove(i);
+            {
+                // Get correct status message
+                match wait_status {
+                    WaitStatus::Exited(_pid, ..) => println!(
+                        "{} done: {}",
+                        job_tracker.jobs[i].num, job_tracker.jobs[i].cmd
+                    ),
+                    WaitStatus::Signaled(_pid, signal, ..) => {
+                        println!("{} killed by {:?}", _pid, signal)
+                    }
+                    _ => (),
+                };
+                job_tracker.jobs.remove(i);
+            }
         }
 
         let (cur_command, mut args) = prompt::prompt();
