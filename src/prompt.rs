@@ -16,7 +16,7 @@ pub fn prompt() -> (String, Vec<String>) {
     stdin.read_line(&mut input).unwrap();
 
     (
-        input.clone(),
+        input.trim().to_string(),
         input.trim().split(' ').map(|s| s.to_string()).collect(),
     )
 }

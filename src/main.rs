@@ -86,10 +86,9 @@ fn main() {
         tilde_expansion::tilde_expansion(&mut args);
 
         // Remove ampersand
-        if !args.is_empty() && args.last().unwrap() == "&" {
+        if args.len() > 1 && args.last().unwrap() == "&" {
             bg_flag = true;
             args.pop();
-            cur_command.pop();
             cur_command.pop();
         }
 
