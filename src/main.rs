@@ -5,18 +5,19 @@ mod path_search;
 mod prompt;
 mod tilde_expansion;
 
-use nix::{
-    errno::Errno,
-    libc::{c_int, chdir, getenv, setenv},
-    sys::wait::{WaitPidFlag, WaitStatus, waitpid},
-    unistd::Pid,
-};
-
-use std::{
-    env,
-    ffi::{CStr, CString},
-    os::fd::IntoRawFd,
-    str::FromStr,
+use {
+    nix::{
+        errno::Errno,
+        libc::{c_int, chdir, getenv, setenv},
+        sys::wait::{WaitPidFlag, WaitStatus, waitpid},
+        unistd::Pid,
+    },
+    std::{
+        env,
+        ffi::{CStr, CString},
+        os::fd::IntoRawFd,
+        str::FromStr,
+    },
 };
 
 #[derive(Clone, Debug)]
