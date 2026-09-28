@@ -12,9 +12,10 @@ use {
     std::{ffi::CString, str::FromStr},
 };
 
-// execute - Runs array of commands with plag for background processing.
-// cmds - array of commands which include the args and the input/output fds for use on the child
-// bg_flag - true for background processing and false for no background processing
+/// execute - Runs array of commands with plag for background processing.
+/// 
+/// - cmds : array of commands which include the args and the input/output fds for use on the child
+/// - bg_flag : true for background processing and false for no background processing
 pub fn execute(mut cmds: Vec<Command>, bg_flag: bool) -> Pid {
     // first pass through commands to check for input/output redirection
     let mut i = 0;

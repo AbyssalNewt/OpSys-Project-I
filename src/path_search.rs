@@ -2,10 +2,13 @@ use std::env::var;
 use nix::unistd::{access, AccessFlags};
 
 /// Searches the path for the 
-pub fn path_search(cmd: &String) -> Option<String>{
+pub fn path_search(cmd: &String) -> Option<String> {
+
     if cmd.len() == 0{
         return None;
     }
+
+    if &cmd[0..1] == "/" { return Some(cmd.to_string()) };
 
     let path = var("PATH").unwrap_or_default();
 
