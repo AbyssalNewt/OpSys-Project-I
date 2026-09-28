@@ -89,7 +89,9 @@ fn main() {
         match args[0].as_str() {
             "exit" => {
 
-                //TODO: waitpid on the jobs list until they all finish
+                for job in job_tracker.jobs{
+                    waitpid(job.1, None).unwrap();
+                }
 
                 if command_history.is_empty()
                 {
