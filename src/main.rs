@@ -48,7 +48,7 @@ fn main() {
         jobs: Vec::new(),
     };
 
-    let mut command_history: Vec<Vec<String>> = Vec::new();
+    let mut command_history: Vec<String> = Vec::new();
     let mut bg_flag: bool = false;
 
     loop {
@@ -98,12 +98,12 @@ fn main() {
                     println!("No valid commands entered in session. Exiting.");
                 } else if command_history.len() < 3 {
                     let last_command = command_history.pop().unwrap();
-                    println!("Last valid command: \n{}\nExiting.", last_command.join(" "));
+                    println!("Last valid command: \n{}\nExiting.", last_command);
                 } else {
                     println!("Last three valid commands:\n");
                     let mut i = 3;
                     while i > 0 {
-                        let command = command_history.pop().unwrap().join(" ");
+                        let command = command_history.pop().unwrap();
                         println!("{}", command);
                         i -= 1;
                     }
@@ -113,7 +113,7 @@ fn main() {
             }
             "cd" => {
                 if cd(&mut args) {
-                    command_history.push(args);
+                    command_history.push(cur_command);
                 }
                 continue;
             }
@@ -122,13 +122,13 @@ fn main() {
                     println!("Too many arguments: {}", args[1..].join(" "));
                 } else if job_tracker.jobs.is_empty() {
                     println!("No active background processes.");
-                    command_history.push(args);
+                    command_history.push(cur_command);
                 } else {
                     println!("{:<8}| {:<8}|{}", "Job No.", "PID", "Command");
                     for job in job_tracker.jobs.iter() {
                         println!("{:<8}  {:<8} {}", job.num, job.pid, job.cmd);
                     }
-                    command_history.push(args);
+                    command_history.push(cur_command);
                 }
                 continue;
             }
@@ -191,16 +191,22 @@ fn main() {
             });
         }
 
-        //TODO: determine whether to add command to command history from execute::execute
-        execute::execute(cmds, bg_flag, &mut job_tracker);
-        bg_flag = false;
+        let pid = execute::execute(cmds, bg_flag);
+        command_history.push(cur_command.clone());
+        if bg_flag {
+            job_tracker.push(pid, cur_command);
+            println!(
+                "{} {}",
+                job_tracker.jobs.last().unwrap().num,
+                job_tracker.jobs.last().unwrap().pid
+            );
+            bg_flag = false;
+        }
         println!();
-
-        //println!("Command entered: {}, input file: {}, output file: {}", cmd.args[0], cmd.input.unwrap_or("N/A".to_string()), cmd.output.unwrap_or("N/A".to_string()));
     }
 }
 
-fn cd(args: &mut Vec<String>) -> bool {
+fn cd(args: &mut [String]) -> bool {
     if args.len() > 2 {
         println!("cd: too many arguments");
         return false;

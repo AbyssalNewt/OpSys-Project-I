@@ -1,16 +1,18 @@
-use crate::io_redir::{Command, io_parse};
-use nix::errno::Errno;
-use nix::libc::{_exit, STDIN_FILENO, STDOUT_FILENO, close, dup2};
-use nix::sys::wait::waitpid;
-use nix::unistd::{
-    ForkResult::{Child, Parent},
-    execv, fork,
+use {
+    crate::io_redir::{Command, io_parse},
+    nix::{
+        errno::Errno,
+        libc::{_exit, STDIN_FILENO, STDOUT_FILENO, close, dup2},
+        sys::wait::waitpid,
+        unistd::{
+            ForkResult::{Child, Parent},
+            Pid, execv, fork,
+        },
+    },
+    std::{ffi::CString, str::FromStr},
 };
 
-use std::{ffi::CString, str::FromStr};
-use crate::JobTracker;
-
-pub fn execute(mut cmds: Vec<Command>, bg_flag : bool, job_tracker: &mut JobTracker) {
+pub fn execute(mut cmds: Vec<Command>, bg_flag: bool) -> Pid {
     let mut i = 0;
     while i < cmds.len() {
         cmds[i] = io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output).unwrap();
@@ -31,9 +33,7 @@ pub fn execute(mut cmds: Vec<Command>, bg_flag : bool, job_tracker: &mut JobTrac
 
         match pid {
             Child => {
-                if !cmd.input.is_none() {
-                    let in_fd = cmd.input.unwrap();
-
+                if let Some(in_fd) = cmd.input {
                     if in_fd < 0 {
                         let err = Errno::last();
                         match err {
@@ -51,9 +51,7 @@ pub fn execute(mut cmds: Vec<Command>, bg_flag : bool, job_tracker: &mut JobTrac
                         close(in_fd);
                     }
                 }
-                if !cmd.output.is_none() {
-                    let out_fd = cmd.output.unwrap();
-
+                if let Some(out_fd) = cmd.output {
                     if out_fd < 0 {
                         let err = Errno::last();
                         match err {
@@ -71,27 +69,34 @@ pub fn execute(mut cmds: Vec<Command>, bg_flag : bool, job_tracker: &mut JobTrac
                     }
                 }
 
-                for l in i*2+3..=2*cmds.len() {
-                    unsafe{ close(l as i32); }
+                for l in i * 2 + 3..=2 * cmds.len() {
+                    unsafe {
+                        close(l as i32);
+                    }
                 }
 
                 execv(cstr_args[0].as_c_str(), &cstr_args).unwrap();
             }
 
             Parent { child } => {
-                if let Some(input) = cmd.input { unsafe {close(input);} }
-                if let Some(output) = cmd.output { unsafe {close(output);} }
+                if let Some(input) = cmd.input {
+                    unsafe {
+                        close(input);
+                    }
+                }
+                if let Some(output) = cmd.output {
+                    unsafe {
+                        close(output);
+                    }
+                }
                 pid_array.push(child);
             }
         }
     }
-    if bg_flag{
-        job_tracker.push(*pid_array.last().unwrap());
-        println!("{} {}", job_tracker.jobs.last().unwrap().num, job_tracker.jobs.last().unwrap().pid);
-    }
-    else{
-        for pid in pid_array {
-            waitpid(pid, None).unwrap();
+    if !bg_flag {
+        for pid in &pid_array {
+            waitpid(*pid, None).unwrap();
         }
     }
+    *pid_array.last().unwrap()
 }
