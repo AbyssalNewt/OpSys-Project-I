@@ -1,67 +1,77 @@
-use std::env;
-use std::ffi::{CString, CStr};
-use std::os::fd::IntoRawFd;
-use std::str::FromStr;
-use nix::errno::Errno;
-use nix::libc::{c_int, chdir, getenv, setenv};
-use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
-use nix::unistd::Pid;
-
+use nix::{
+    errno::Errno,
+    libc::{c_int, chdir, getenv, setenv},
+    sys::wait::{WaitPidFlag, WaitStatus, waitpid},
+    unistd::Pid,
+};
+use std::{
+    env,
+    ffi::{CStr, CString},
+    os::fd::IntoRawFd,
+    str::FromStr,
+};
 mod env_expansion;
+mod execute;
+mod io_redir;
 mod path_search;
 mod prompt;
 mod tilde_expansion;
-mod execute;
-mod io_redir;
 
 #[derive(Clone)]
 pub struct JobTracker {
-    last_job:i32, //or c_int or whatever
-    cur_command:String,
-    jobs : Vec<(i32, nix::unistd::Pid, String)> //job number, pid, and command
+    last_job: i32, //or c_int or whatever
+    cur_command: String,
+    jobs: Vec<(i32, nix::unistd::Pid, String)>, //job number, pid, and command
 }
 impl JobTracker {
-    fn push(&mut self, pid :nix::unistd::Pid) {
+    fn push(&mut self, pid: nix::unistd::Pid) {
         self.last_job += 1;
-        self.jobs.push((self.last_job,pid,self.cur_command.clone()));
+        self.jobs
+            .push((self.last_job, pid, self.cur_command.clone()));
     }
 }
 
 fn main() {
-
-    let mut job_tracker = JobTracker{
-        last_job : 0,
-        cur_command : String::new(),
-        jobs : Vec::new()
+    let mut job_tracker = JobTracker {
+        last_job: 0,
+        cur_command: String::new(),
+        jobs: Vec::new(),
     };
 
     let mut command_history: Vec<Vec<String>> = Vec::new();
 
-    let mut bg_flag : bool = false;
+    let mut bg_flag: bool = false;
 
     loop {
         loop {
             match waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
                 Ok(WaitStatus::Exited(_pid, status)) => {
-                    if let Some(job_index) = job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid) {
-                        println!("{} done: {}", job_tracker.jobs[job_index].0, job_tracker.jobs[job_index].2);
+                    if let Some(job_index) =
+                        job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid)
+                    {
+                        println!(
+                            "{} done: {}",
+                            job_tracker.jobs[job_index].0, job_tracker.jobs[job_index].2
+                        );
                         job_tracker.jobs.remove(job_index);
                     }
-                },
+                }
                 Ok(WaitStatus::Signaled(_pid, signal, core_dumped)) => {
-                    if let Some(job_index) = job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid) {
+                    if let Some(job_index) =
+                        job_tracker.jobs.iter().position(|(_, pid, _)| *pid == _pid)
+                    {
                         println!("{} killed by {:?}", _pid, signal);
                         job_tracker.jobs.remove(job_index);
                     }
-                },
+                }
                 Ok(WaitStatus::StillAlive) => {
                     //All background processes are active.
                     break;
-                },
+                }
                 Err(nix::errno::Errno::ECHILD) => {
                     // No child processes to check.
                     break;
-                },
+                }
                 _ => {}
             }
         }
@@ -71,76 +81,56 @@ fn main() {
         env_expansion::env_expansion(&mut args);
         tilde_expansion::tilde_expansion(&mut args);
 
-        /*let mut cmd : io_redir::Command = match io_redir::io_parse(args){
-            Ok(com) => {com}
-            Err(err) => {
-                println!("{}", err);
-                continue;
-            }
-        };*/
-
-        if !args.is_empty() && args.last().unwrap() == "&"{
+        if !args.is_empty() && args.last().unwrap() == "&" {
             bg_flag = true;
             args.pop();
             job_tracker.cur_command.pop();
         }
 
-        // replace with the built-ins later
         match args[0].as_str() {
             "exit" => {
-
-                for job in job_tracker.jobs{
+                for job in job_tracker.jobs {
                     waitpid(job.1, None).unwrap();
                 }
 
-                if command_history.is_empty()
-                {
+                if command_history.is_empty() {
                     println!("No valid commands entered in session. Exiting.");
-                }
-                else if command_history.len() < 3
-                {
+                } else if command_history.len() < 3 {
                     let last_command = command_history.pop().unwrap();
                     println!("Last valid command: \n{}\nExiting.", last_command.join(" "));
-                }
-                else{
+                } else {
                     println!("Last three valid commands:\n");
                     let mut i = 3;
-                    while i > 0{
+                    while i > 0 {
                         let command = command_history.pop().unwrap().join(" ");
                         println!("{}", command);
-                        i = i - 1;
+                        i -= 1;
                     }
                     println!("Exiting.");
                 }
-                break
-            },
+                break;
+            }
             "cd" => {
-                if cd(&mut args){
+                if cd(&mut args) {
                     command_history.push(args);
                 }
                 continue;
-
-            },
-            "jobs" =>
-                {
-                    if args.len() > 1{
-                        println!("Too many arguments: {}", args[1..].join(" "));
+            }
+            "jobs" => {
+                if args.len() > 1 {
+                    println!("Too many arguments: {}", args[1..].join(" "));
+                } else if job_tracker.jobs.is_empty() {
+                    println!("No active background processes.");
+                    command_history.push(args);
+                } else {
+                    println!("{:<8}| {:<8}|{}", "Job No.", "PID", "Command");
+                    for job in job_tracker.jobs.iter() {
+                        println!("{:<8}  {:<8} {}", job.0, job.1, job.2);
                     }
-                    else if job_tracker.jobs.is_empty()
-                    {
-                        println!("No active background processes.");
-                        command_history.push(args);
-                    }
-                    else {
-                        println!("{:<8}| {:<8}|{}", "Job No.", "PID", "Command");
-                        for job in job_tracker.jobs.iter()
-                        {
-                            println!("{:<8}  {:<8} {}", job.0, job.1, job.2);
-                        }
-                        command_history.push(args);
-                    }
-                    continue;
+                    command_history.push(args);
                 }
+                continue;
+            }
             _ => (),
         }
 
@@ -158,13 +148,15 @@ fn main() {
             };
             let mut stupid = vec![command];
             if arg == "|" {
-                let mut pipe_args : [c_int;2] = [0;2];
-                let input : c_int;
+                let mut pipe_args: [c_int; 2] = [0; 2];
+                let input: c_int;
                 let output: c_int;
-                unsafe {nix::libc::pipe(&mut pipe_args[0]);}
+                unsafe {
+                    nix::libc::pipe(&mut pipe_args[0]);
+                }
                 (output, input) = (pipe_args[0], pipe_args[1]);
 
-                stupid.extend(args[lastpipe+1..i].iter().cloned());
+                stupid.extend(args[lastpipe + 1..i].iter().cloned());
                 cmds.push(io_redir::Command {
                     args: stupid,
                     input: last_out,
@@ -208,8 +200,6 @@ fn main() {
 }
 
 fn cd(args: &mut Vec<String>) -> bool {
-
-
     if args.len() > 2 {
         println!("cd: too many arguments");
         return false;
@@ -218,54 +208,51 @@ fn cd(args: &mut Vec<String>) -> bool {
     let target_path: String = if args.len() == 1 {
         env::var("HOME").unwrap_or_else(|_| String::from("/"))
     } else {
-        let full = if args[1].starts_with('/'){
+        let full = if args[1].starts_with('/') {
             args[1].clone()
-        }
-        else{
+        } else {
             let cwd_key = CString::from_str("PWD").unwrap();
             let cwd = unsafe { getenv(cwd_key.as_ptr()) };
             let cwd_str = if cwd.is_null() {
                 "/"
-            }
-                else{
-                    unsafe { CStr::from_ptr(cwd) }.to_str().unwrap_or("/")
-                };
+            } else {
+                unsafe { CStr::from_ptr(cwd) }.to_str().unwrap_or("/")
+            };
             format!("{}/{}", cwd_str, args[1])
         };
         let mut stack: Vec<&str> = Vec::new();
 
         for segment in full.split("/") {
-            match segment{
-                "" | "." => {},
-                ".." => {stack.pop();},
-                name => {stack.push(name);}
+            match segment {
+                "" | "." => {}
+                ".." => {
+                    stack.pop();
+                }
+                name => {
+                    stack.push(name);
+                }
             }
         }
-        if stack.is_empty(){
+        if stack.is_empty() {
             "/".to_string()
-        }
-        else {
+        } else {
             format!("/{}", stack.join("/"))
         }
     };
-    let c_target = match CString::new(target_path)
-    {
+    let c_target = match CString::new(target_path) {
         Ok(c) => c,
-        Err(_) => return false
+        Err(_) => return false,
     };
     let pwd_key = CString::new("PWD").unwrap();
 
     unsafe {
-
-
         let result = chdir(c_target.as_ptr());
         if result == 0 {
             setenv(pwd_key.as_ptr(), c_target.as_ptr(), 1);
             true
         } else {
             let err = Errno::last();
-            match err
-            {
+            match err {
                 Errno::EACCES => println!("{}: Permission denied.", args[1]),
                 Errno::ENOENT => println!("cd: {}: No such file or directory", args[1]),
                 Errno::ENOTDIR => println!("cd: {}: Not a directory", args[1]),
@@ -275,4 +262,3 @@ fn cd(args: &mut Vec<String>) -> bool {
         }
     }
 }
-
