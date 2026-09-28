@@ -1,10 +1,9 @@
 use std::env;
-use std::env::current_dir;
-use std::ffi::{c_char, CString, CStr};
+use std::ffi::{CString, CStr};
 use std::os::fd::IntoRawFd;
 use std::str::FromStr;
 use nix::errno::Errno;
-use nix::libc::{c_int, chdir, getcwd, getenv, setenv};
+use nix::libc::{c_int, chdir, getenv, setenv};
 
 mod env_expansion;
 mod path_search;
@@ -109,18 +108,22 @@ fn cd(args: &mut Vec<String>) {
         return;
     }
 
-    let target_path: *const c_char = if args.len() == 1 {
-        CString::new(env::var("HOME").unwrap_or_default()).unwrap()
+    let target_path: String = if args.len() == 1 {
+        env::var("HOME").unwrap_or_else(|_| String::from("/"))
     } else {
         let full = if args[1].starts_with('/'){
-            &mut args[1]
+            args[1].clone()
         }
         else{
-
-            let cwd = unsafe { getenv(CString::from_str("PWD").unwrap().as_ptr()) };
-            let c_str = unsafe { CStr::from_ptr(cwd) };
-            let cwd_str = c_str.to_str().unwrap();
-            &mut format!("{}/{}", cwd_str, args[1])
+            let cwd_key = CString::from_str("PWD").unwrap();
+            let cwd = unsafe { getenv(cwd_key.as_ptr()) };
+            let cwd_str = if cwd.is_null() {
+                "/"
+            }
+                else{
+                    unsafe { CStr::from_ptr(cwd) }.to_str().unwrap_or("/")
+                };
+            format!("{}/{}", cwd_str, args[1])
         };
         let mut stack: Vec<&str> = Vec::new();
 
@@ -131,23 +134,27 @@ fn cd(args: &mut Vec<String>) {
                 name => {stack.push(name);}
             }
         }
-
         if stack.is_empty(){
-            CString::new("/".to_string()).unwrap().as_ptr()
+            "/".to_string()
         }
         else {
-            CString::new("/".to_string() + stack.join("/").as_str()).unwrap().as_ptr()
+            format!("/{}", stack.join("/"))
         }
-
-
     };
+    let c_target = match CString::new(target_path)
+    {
+        Ok(c) => c,
+        Err(_) => return
+    };
+    let pwd_key = CString::new("PWD").unwrap();
+
     unsafe {
 
 
-        let result = chdir(target_path);
+        let result = chdir(c_target.as_ptr());
         if result == 0 {
 
-            setenv(CString::new("PWD").unwrap().as_ptr(), target_path, 1);
+            setenv(pwd_key.as_ptr(), c_target.as_ptr(), 1);
         } else {
             let err = Errno::last();
             match err
