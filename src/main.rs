@@ -142,16 +142,16 @@ fn main() {
         let mut lastpipe = 0;
         let mut last_out: Option<c_int> = None;
 
+        // Piping and Pathsearch
         for (i, arg) in args.iter().enumerate() {
-            let command = match path_search::path_search(&args[lastpipe]) {
-                Some(t) => t,
-                _ => {
-                    println!("{}: command not found\n", args[lastpipe]);
-                    continue;
-                }
-            };
-            let mut stupid = vec![command];
             if arg == "|" {
+                let mut command = vec![match path_search::path_search(&args[lastpipe]) {
+                    Some(t) => t,
+                    _ => {
+                        println!("{}: command not found\n", args[lastpipe]);
+                        continue;
+                    }
+                }];
                 let mut pipe_args: [c_int; 2] = [0; 2];
                 let input: c_int;
                 let output: c_int;
@@ -160,9 +160,9 @@ fn main() {
                 }
                 (output, input) = (pipe_args[0], pipe_args[1]);
 
-                stupid.extend(args[lastpipe + 1..i].iter().cloned());
+                command.extend(args[lastpipe + 1..i].iter().cloned());
                 cmds.push(io_redir::Command {
-                    args: stupid,
+                    args: command,
                     input: last_out,
                     output: Some(input.into_raw_fd()),
                 });
