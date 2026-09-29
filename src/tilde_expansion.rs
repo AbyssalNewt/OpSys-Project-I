@@ -17,6 +17,7 @@ pub fn tilde_expansion(args: &mut [String]) -> &mut [String] {
 
             s if s.starts_with("~/") => *arg = home.clone() + &arg[1..],
             s if s.starts_with("./") => *arg = pwd.clone() + &arg[1..],
+            s if s.starts_with("/") => (),
             _ => *arg = pwd.clone() + "/" + arg,
         };
         // Everything at this point is a full-path.

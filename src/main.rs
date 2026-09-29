@@ -80,6 +80,7 @@ fn main() {
             }
         }
 
+        //Take input from the user and expand env and tilde arguments
         let (mut cur_command, mut args) = prompt::prompt();
         if args == [""] { continue };
         env_expansion::env_expansion(&mut args);
@@ -92,6 +93,7 @@ fn main() {
             cur_command.pop();
         }
 
+        //Parse for internal commands and execute them accordingly.
         match args[0].as_str() {
             "exit" => {
                 for job in job_tracker.jobs {
@@ -104,12 +106,9 @@ fn main() {
                     let last_command = command_history.pop().unwrap();
                     println!("Last valid command: \n{}\nExiting.", last_command);
                 } else {
-                    println!("Last three valid commands:\n");
-                    let mut i = 3;
-                    while i > 0 {
-                        let command = command_history.pop().unwrap();
+                    println!("Last three valid commands:");
+                    for command in &command_history[command_history.len()-3..] {
                         println!("{}", command);
-                        i -= 1;
                     }
                     println!("Exiting.");
                 }
@@ -221,9 +220,12 @@ fn cd(args: &mut [String]) -> bool {
     let target_path: String = if args.len() == 1 {
         home
     } else {
-        if &args[1][0..1] != "/" {
+        //If an argument is supplied, append pwd if it is a relative path
+        if !args[1].starts_with("/") {
+            println!("{} did not start with /", args[1]);
             env::var("PWD").unwrap_or_default() + "/" + &args[1]
         } else {
+            println!("{} started with /", args[1]);
             args[1].clone()
         }
     };
@@ -235,6 +237,7 @@ fn cd(args: &mut [String]) -> bool {
     let pwd_key = CString::new("PWD").unwrap();
 
     unsafe {
+        //call chdir system call and update the PWD environment variable if successful
         let result = chdir(c_target.as_ptr());
         if result == 0 {
             setenv(pwd_key.as_ptr(), c_target.as_ptr(), 1);
