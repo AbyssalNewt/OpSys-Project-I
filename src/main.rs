@@ -8,15 +8,14 @@ mod tilde_expansion;
 use {
     nix::{
         errno::Errno,
-        libc::{SYS_set_mempolicy_home_node, c_int, chdir, getenv, setenv},
+        libc::{c_int, chdir, setenv},
         sys::wait::{WaitPidFlag, WaitStatus, waitpid},
         unistd::Pid,
     },
     std::{
         env,
-        ffi::{CStr, CString},
+        ffi::CString,
         os::fd::IntoRawFd,
-        str::FromStr,
     },
 };
 
@@ -82,6 +81,7 @@ fn main() {
         }
 
         let (mut cur_command, mut args) = prompt::prompt();
+        if args == [""] { continue };
         env_expansion::env_expansion(&mut args);
         tilde_expansion::tilde_expansion(&mut args);
 
