@@ -222,10 +222,8 @@ fn cd(args: &mut [String]) -> bool {
     } else {
         //If an argument is supplied, append pwd if it is a relative path
         if !args[1].starts_with("/") {
-            println!("{} did not start with /", args[1]);
             env::var("PWD").unwrap_or_default() + "/" + &args[1]
         } else {
-            println!("{} started with /", args[1]);
             args[1].clone()
         }
     };
