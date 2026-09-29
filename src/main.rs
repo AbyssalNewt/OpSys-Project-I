@@ -7,12 +7,8 @@ mod tilde_expansion;
 
 use {
     nix::{
-        errno::Errno,
-        libc::{c_int, chdir, getenv, setenv},
-        sys::wait::{WaitPidFlag, WaitStatus, waitpid},
-        unistd::Pid,
-    },
-    std::{
+        errno::Errno, libc::{SYS_set_mempolicy_home_node, c_int, chdir, getenv, setenv}, sys::wait::{WaitPidFlag, WaitStatus, waitpid}, unistd::Pid,
+    }, std::{
         env,
         ffi::{CStr, CString},
         os::fd::IntoRawFd,
@@ -216,40 +212,16 @@ fn cd(args: &mut [String]) -> bool {
         return false;
     }
 
-    let target_path: String = if args.len() == 1 {
-        env::var("HOME").unwrap_or_else(|_| String::from("/"))
-    } else {
-        let full = if args[1].starts_with('/') {
-            args[1].clone()
-        } else {
-            let cwd_key = CString::from_str("PWD").unwrap();
-            let cwd = unsafe { getenv(cwd_key.as_ptr()) };
-            let cwd_str = if cwd.is_null() {
-                "/"
-            } else {
-                unsafe { CStr::from_ptr(cwd) }.to_str().unwrap_or("/")
-            };
-            format!("{}/{}", cwd_str, args[1])
-        };
-        let mut stack: Vec<&str> = Vec::new();
+    // TODO: Fix `cd` and `cd directory` without slash not working
+    let home: String = env::var("HOME").unwrap_or_else(|_| String::from("/"));
 
-        for segment in full.split("/") {
-            match segment {
-                "" | "." => {}
-                ".." => {
-                    stack.pop();
-                }
-                name => {
-                    stack.push(name);
-                }
-            }
-        }
-        if stack.is_empty() {
-            "/".to_string()
-        } else {
-            format!("/{}", stack.join("/"))
-        }
+    let target_path: String = if args.len() == 1 {
+        home
+    } else {
+        if &args[1][0..1] != "/" { home + &args[1] }
+        else { args[1].clone() }
     };
+
     let c_target = match CString::new(target_path) {
         Ok(c) => c,
         Err(_) => return false,
