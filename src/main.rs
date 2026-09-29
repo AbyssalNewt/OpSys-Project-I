@@ -7,8 +7,12 @@ mod tilde_expansion;
 
 use {
     nix::{
-        errno::Errno, libc::{SYS_set_mempolicy_home_node, c_int, chdir, getenv, setenv}, sys::wait::{WaitPidFlag, WaitStatus, waitpid}, unistd::Pid,
-    }, std::{
+        errno::Errno,
+        libc::{SYS_set_mempolicy_home_node, c_int, chdir, getenv, setenv},
+        sys::wait::{WaitPidFlag, WaitStatus, waitpid},
+        unistd::Pid,
+    },
+    std::{
         env,
         ffi::{CStr, CString},
         os::fd::IntoRawFd,
@@ -212,14 +216,16 @@ fn cd(args: &mut [String]) -> bool {
         return false;
     }
 
-    // TODO: Fix `cd` and `cd directory` without slash not working
     let home: String = env::var("HOME").unwrap_or_else(|_| String::from("/"));
 
     let target_path: String = if args.len() == 1 {
         home
     } else {
-        if &args[1][0..1] != "/" { home + &args[1] }
-        else { args[1].clone() }
+        if &args[1][0..1] != "/" {
+            env::var("PWD").unwrap_or_default() + "/" + &args[1]
+        } else {
+            args[1].clone()
+        }
     };
 
     let c_target = match CString::new(target_path) {
