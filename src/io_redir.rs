@@ -30,9 +30,9 @@ pub fn io_parse(
                 //  return Err("Error: extra input redirector".to_string());
                 //}
 
-                if input.is_none() && output.is_none() {
+                if new_args.is_none() {
                     //The args of the command are separated from the I/O redirection upon finding I/O redirection
-                    new_args = Some(args[..i].to_vec());
+                    new_args = Some(args[..i].to_vec())
                 }
 
                 if args[i + 1].starts_with("~") {
@@ -61,8 +61,9 @@ pub fn io_parse(
                 //   return Err("Error: extra output redirector".to_string());
                 //}
 
-                if input.is_none() && output.is_none() {
-                    new_args = Some(args[..i].to_vec());
+                if new_args.is_none() {
+                    //The args of the command are separated from the I/O redirection upon finding I/O redirection
+                    new_args = Some(args[..i].to_vec())
                 }
 
                 if args[i + 1].starts_with("~") {
