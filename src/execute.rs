@@ -16,11 +16,16 @@ use {
 /// 
 /// - cmds : array of commands which include the args and the input/output fds for use on the child
 /// - bg_flag : true for background processing and false for no background processing
-pub fn execute(mut cmds: Vec<Command>, bg_flag: bool) -> Pid {
+pub fn execute(mut cmds: Vec<Command>, bg_flag: bool) -> Result<Pid,String> {
     // first pass through commands to check for input/output redirection
     let mut i = 0;
     while i < cmds.len() {
-        cmds[i] = io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output).unwrap();
+        let cmd = match io_parse(cmds[i].args.to_vec(), cmds[i].input, cmds[i].output)
+        {
+            Ok(cmd) => cmd,
+            Err(cmd) => return Err(cmd),
+        };
+        cmds[i] = cmd;
         i += 1;
     }
 
@@ -118,5 +123,5 @@ pub fn execute(mut cmds: Vec<Command>, bg_flag: bool) -> Pid {
         }
     }
     // return last child pid for management purposes and to ensure it finished properly
-    *pid_array.last().unwrap()
+    Ok(*pid_array.last().unwrap())
 }

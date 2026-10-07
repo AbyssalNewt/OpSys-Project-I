@@ -194,7 +194,13 @@ fn main() {
             });
         }
 
-        let pid = execute::execute(cmds, bg_flag);
+        let pid: Pid;
+        match execute::execute(cmds, bg_flag)
+        {
+            Ok(result) => pid = result,
+            Err(result) => {println!("{}", result);
+            continue;}
+        }
         command_history.push(cur_command.clone());
         if bg_flag {
             job_tracker.push(pid, cur_command);

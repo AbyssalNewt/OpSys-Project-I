@@ -1,6 +1,6 @@
-use nix::libc::fchmod;
+use nix::libc::{fchmod, fstat, S_IFMT, S_IFREG, S_IXUSR, S_IXGRP, S_IXOTH, close};
 use {
-    nix::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, S_IRUSR, open},
+    nix::libc::{O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, S_IRUSR, open, stat},
     std::{env, ffi::CString},
 };
 
@@ -36,24 +36,40 @@ pub fn io_parse(
                     new_args = Some(args[..i].to_vec())
                 }
 
+                let input_string: CString;
                 if args[i + 1].starts_with("~") {
-                    let input_string: CString = CString::new(
+                    input_string = CString::new(
                         env::var("HOME").unwrap_or_default() + "/" + args[i + 1].as_str(),
                     )
                     .unwrap();
-                    input = Some(unsafe { open(input_string.as_ptr(), O_RDONLY, S_IRUSR) });
+
                 } else if !args[i + 1].starts_with("/") {
                     //The file path is a relative path, so we are adding the cwd to it.
-                    let input_string: CString =
+                    input_string =
                         CString::new(env::var("PWD").unwrap() + "/" + args[i + 1].as_str())
                             .unwrap();
-                    input = Some(unsafe { open(input_string.as_ptr(), O_RDONLY, S_IRUSR) });
                 } else {
                     //The file path is an absolute path, so we can take it as it is.
-                    let input_string: CString = CString::new(args[i + 1].clone()).unwrap();
-                    input = Some(unsafe { open(input_string.as_ptr(), O_RDONLY, S_IRUSR) });
+                    input_string = CString::new(args[i + 1].clone()).unwrap();
+                }
+                let fd = unsafe {open(input_string.as_ptr(), O_RDONLY, S_IRUSR)};
+                if fd < 0{
+                    return Err("Error opening input file".to_string());
+                }
+                let mut st: stat = unsafe { std::mem::zeroed() };
+                let stat_res = unsafe{ fstat(fd, &mut st)};
+
+                if stat_res < 0{
+                    return Err("Error stating input file".to_string());
                 }
 
+                let is_regular_file = ((st.st_mode & S_IFMT) == S_IFREG) && (st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) == 0;
+                if !is_regular_file{
+                    unsafe{close(fd);}
+                    return Err("Input redirection must be a regular file".to_string());
+                }
+
+                input = Some(fd);
                 i += 1;
             }
             ">" => {
